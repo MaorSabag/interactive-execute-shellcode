@@ -17,9 +17,9 @@ beacon_command_register(
 alias interactive_execute_shellcode {
    local('$bid @valid_opts %opts $opt_cnt $opt_ind $opt $value $barch $handle $data $args');
 
-   %opts["--process"] = "default";
-   %opts["--technique"] = "technique1";
-   %opts["--shellcode"] = "shellcode1";
+   %opts["--process"] = "notepad";
+   %opts["--technique"] = "ThreadHijacking";
+   %opts["--shellcode"] = "";
 
    $bid = @_[0];
    $opt_cnt = size(@_);
