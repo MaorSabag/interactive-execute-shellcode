@@ -1,0 +1,60 @@
+beacon_command_register(
+   "my_bof",
+   "Used to demonstrate the key value internal beacon APIs",
+
+   "Usage:\n" .
+   "   my_bof [options]\n\n" .
+
+   "Options (specified in any order):\n" .
+   "   --process <process>            - specify a process to use for the BOF\n" .
+   "   --technique <technique>        - specify which technique to use in the BOF\n" .
+   "   --shellcode <shellcode file>   - specify the shellcode file to use\n\n" .
+
+   "Examples:\n" .
+   "   my_bof --process default --technique technique1 --shellcode shellcode1\n"
+);
+
+alias my_bof {
+   local('$bid @valid_opts %opts $opt_cnt $opt_ind $opt $value $barch $handle $data $args');
+
+   %opts["--process"] = "default";
+   %opts["--technique"] = "technique1";
+   %opts["--shellcode"] = "shellcode1";
+
+   $bid = @_[0];
+   $opt_cnt = size(@_);
+   @valid_opts = @("--process", "--technique", "--shellcode");
+   for($opt_ind = 1; $opt_ind < $opt_cnt; $opt_ind++) {
+      $opt = @_[$opt_ind];
+      $opt_ind++;
+      $value = iff( $opt_ind >= $opt_cnt, $null, @_[$opt_ind] );
+
+      if ($opt !in @valid_opts) {
+         berror($bid, "$opt is not a valid option.");
+         return;
+      }
+      if ($value is $null || $value in @valid_opts) {
+         berror($bid, "Missing or invalid value for the $opt option.");
+         return;
+      }
+
+      %opts[$opt] = $value;
+   }
+
+    $barch  = barch($bid);
+    $handle = openf(script_resource("my_bof. $+ $barch $+ .o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    $sc_handle = openf(%opts["--shellcode"]);
+    $sc_data = readb($sc_handle, -1);
+    closef($sc_handle);
+
+    $sc_len = strlen($sc_data);
+
+    $args = bof_pack($1, "pIzz", $sc_data, $sc_len, %opts["--process"], %opts["--technique"]);
+
+    btask($bid, "Running my_bof BOF using process: " . %opts["--process"] . ", technique: " . %opts["--technique"] . ", and shellcode: " . %opts["--shellcode"]);
+
+    #beacon_inline_execute($bid, $data, "go", $args);
+}
