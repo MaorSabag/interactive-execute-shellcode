@@ -1,24 +1,39 @@
 #pragma once
-#include <windows.h>
 
-DECLSPEC_IMPORT WINBASEAPI DWORD WINAPI KERNEL32$GetLastError (VOID);
-DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$ReadFile (HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
-DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$CreatePipe (PHANDLE, PHANDLE, LPSECURITY_ATTRIBUTES, DWORD);
-DECLSPEC_IMPORT WINBASEAPI HANDLE WINAPI KERNEL32$GetStdHandle (DWORD);
-DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$SetHandleInformation (HANDLE, DWORD, DWORD);
-DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$CreateProcessA(LPCSTR, LPSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, LPVOID, LPCSTR, LPSTARTUPINFOA, LPPROCESS_INFORMATION);
-DECLSPEC_IMPORT WINBASEAPI VOID KERNEL32$CloseHandle (HANDLE);
+extern "C" {
+	// Kernel32 API
+	DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$ReadFile (HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
+	DECLSPEC_IMPORT WINBASEAPI HANDLE WINAPI KERNEL32$GetStdHandle (DWORD);
+	DECLSPEC_IMPORT WINBASEAPI BOOL WINAPI KERNEL32$CreateProcessA(LPCSTR, LPSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, LPVOID, LPCSTR, LPSTARTUPINFOA, LPPROCESS_INFORMATION);
+	DECLSPEC_IMPORT WINBASEAPI VOID KERNEL32$CloseHandle (HANDLE);
+	DECLSPEC_IMPORT WINBASEAPI DWORD WINAPI KERNEL32$GetLastError (VOID);
 
+	// MSVCRT API
+	DECLSPEC_IMPORT int		__cdecl	MSVCRT$_snprintf(LPSTR, size_t, LPCSTR, ...);
+	DECLSPEC_IMPORT void* __cdecl MSVCRT$malloc(size_t size);
+	DECLSPEC_IMPORT void __cdecl MSVCRT$free(void *memblock);
+	DECLSPEC_IMPORT void* __cdecl MSVCRT$realloc(void *memblock, size_t size);
+	DECLSPEC_IMPORT size_t __cdecl MSVCRT$strlen(const char *str);
+	DECLSPEC_IMPORT char* __cdecl MSVCRT$strncat(char *dest, const char *src, size_t count);
+	DECLSPEC_IMPORT int __cdecl MSVCRT$strcmp(const char *str1, const char *str2);
+	DECLSPEC_IMPORT int __cdecl MSVCRT$_snprintf(char *buffer, size_t sizeOfBuffer, const char *format, ...);
+}
+// KERNEL32 API
+#define ReadFile KERNEL32$ReadFile
+#define GetStdHandle KERNEL32$GetStdHandle
+#define CreateProcessA KERNEL32$CreateProcessA
+#define CloseHandle KERNEL32$CloseHandle
+#define GetLastError KERNEL32$GetLastError
 
-WINBASEAPI void __cdecl MSVCRT$memset(void *dest, int c, size_t count);
-DECLSPEC_IMPORT int __cdecl MSVCRT$sprintf(char *buffer, const char *format, ...);
-DECLSPEC_IMPORT void* __cdecl MSVCRT$malloc(size_t size);
-DECLSPEC_IMPORT void __cdecl MSVCRT$free(void *memblock);
-DECLSPEC_IMPORT void* __cdecl MSVCRT$realloc(void *memblock, size_t size);
-DECLSPEC_IMPORT size_t __cdecl MSVCRT$strlen(const char *str);
-DECLSPEC_IMPORT char* __cdecl MSVCRT$strncat(char *dest, const char *src, size_t count);
-DECLSPEC_IMPORT int __cdecl MSVCRT$strcmp(const char *str1, const char *str2);
-DECLSPEC_IMPORT int __cdecl MSVCRT$_snprintf(char *buffer, size_t sizeOfBuffer, const char *format, ...);
+// MSVCRT API
+#define memset MSVCRT$memset
+#define _snprintf MSVCRT$_snprintf
+#define malloc MSVCRT$malloc
+#define free MSVCRT$free
+#define realloc MSVCRT$realloc
+#define strlen MSVCRT$strlen
+#define strncat MSVCRT$strncat
+#define strcmp MSVCRT$strcmp
 
 
 typedef struct _UNICODE_STRING {
@@ -37,8 +52,8 @@ typedef struct _OBJECT_ATTRIBUTES {
 	HANDLE RootDirectory;
 	PUNICODE_STRING ObjectName;
 	ULONG Attributes;
-	PVOID SecurityDescriptor; 
-	PVOID SecurityQualityOfService; 
+	PVOID SecurityDescriptor; // PSECURITY_DESCRIPTOR;
+	PVOID SecurityQualityOfService; // PSECURITY_QUALITY_OF_SERVICE
 } OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
 
 typedef NTSTATUS(NTAPI* _NtCreateThreadEx)(
@@ -198,7 +213,7 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
 }RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;
 
 
-typedef struct _PEB {
+typedef struct {
 	BOOLEAN                 InheritedAddressSpace;
 	BOOLEAN                 ReadImageFileExecOptions;
 	BOOLEAN                 BeingDebugged;
@@ -272,15 +287,16 @@ typedef struct _LDR_MODULE {
 	ULONG                   TimeDateStamp;
 } LDR_MODULE, * PLDR_MODULE;
 
+typedef BOOL (WINAPI *_CreatePipe)(PHANDLE, PHANDLE, LPSECURITY_ATTRIBUTES, DWORD);
+typedef BOOL (WINAPI *_SetHandleInformation)(HANDLE, DWORD, DWORD);
+typedef int (__cdecl *_snprintf_t)(char *buffer, size_t sizeOfBuffer, const char *format, ...);
 
-// Taken from VX-API repository: https://github.com/vxunderground/VX-API
-
-_PPEB GetPeb(VOID)
+PPEB GetPeb(VOID)
 {
 #if defined(_WIN64)
-	return (_PPEB)__readgsqword(0x60);
+	return (PPEB)__readgsqword(0x60);
 #elif defined(_WIN32)
-	return (_PPEB)__readfsdword(0x30);
+	return (PPEB)__readfsdword(0x30);
 #endif
 }
 
