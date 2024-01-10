@@ -24,15 +24,15 @@ typedef struct _OBJECT_ATTRIBUTES {
 typedef NTSTATUS(NTAPI* _NtCreateThreadEx)(
 	OUT PHANDLE hThread,
 	IN ACCESS_MASK DesiredAccess,
-	IN LPVOID ObjectAttributes,
+	IN PVOID ObjectAttributes,
 	IN HANDLE ProcessHandle,
-	IN LPTHREAD_START_ROUTINE lpStartAddress,
-	IN LPVOID lpParameter,
-	IN BOOL CreateSuspended,
-	IN DWORD dwStackSize,
-	IN DWORD dw1,
-	IN DWORD dw2,
-	IN LPVOID Unknown
+	IN PVOID lpStartAddress,
+	IN PVOID lpParameter,
+	IN ULONG Flags,
+	IN SIZE_T StackZeroBits,
+	IN SIZE_T SizeOfStackCommit,
+	IN SIZE_T SizeOfStackReserve,
+	OUT PVOID lpBytesBuffer
 	);
 
 typedef NTSTATUS(NTAPI* _NtWaitForSingleObject)(
@@ -72,7 +72,7 @@ typedef NTSTATUS(NTAPI* _NtResumeThread)(
 	PULONG SuspendCount
 	);
 
-	
+
 typedef NTSTATUS(NTAPI* _NtFreeVirtualMemory)(
 	HANDLE ProcessHandle,
 	PVOID* BaseAddress,
@@ -121,4 +121,39 @@ typedef NTSTATUS(NTAPI* _NtCreateSection)(
 typedef enum _SECTION_INHERIT : DWORD {
 	ViewShare = 1,
 	ViewUnmap = 2
-} SECTION_INHERIT, *PSECTION_INHERIT;
+} SECTION_INHERIT, * PSECTION_INHERIT;
+
+#ifndef _TP_WAIT_CALLBACK
+#define _TP_WAIT_CALLBACK
+
+typedef struct _TP_WAIT_CALLBACK {
+    PVOID Function;
+    PVOID Context;
+    ULONG Flags;
+} TP_WAIT_CALLBACK, *pTP_WAIT_CALLBACK;
+
+#endif // _TP_WAIT_CALLBACK
+
+typedef NTSTATUS(NTAPI* _TpAllocWait)(
+	TP_WAIT** Wait,
+	TP_WAIT_CALLBACK* Callback,
+	PVOID Context,
+	TP_CALLBACK_ENVIRON* environment
+	);
+
+typedef VOID(NTAPI* _TpSetWait)(
+	TP_WAIT* Wait,
+	HANDLE Handle,
+	PLARGE_INTEGER Timeout
+	);
+	
+typedef NTSTATUS(NTAPI* _NtAssociateWaitCompletionPacket)(
+	_In_ HANDLE WaitCompletionPacketHandle,
+    _In_ HANDLE IoCompletionHandle,
+    _In_ HANDLE TargetObjectHandle,
+    _In_opt_ PVOID KeyContext,
+    _In_opt_ PVOID ApcContext,
+    _In_ NTSTATUS IoStatus,
+    _In_ ULONG_PTR IoStatusInformation,
+    _Out_opt_ PBOOLEAN AlreadySignaled
+    );

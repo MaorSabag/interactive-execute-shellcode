@@ -1,4 +1,5 @@
 #pragma once
+#include <windows.h>
 
 extern "C" {
 	// Kernel32 API
@@ -59,15 +60,15 @@ typedef struct _OBJECT_ATTRIBUTES {
 typedef NTSTATUS(NTAPI* _NtCreateThreadEx)(
 	OUT PHANDLE hThread,
 	IN ACCESS_MASK DesiredAccess,
-	IN LPVOID ObjectAttributes,
+	IN PVOID ObjectAttributes,
 	IN HANDLE ProcessHandle,
-	IN LPTHREAD_START_ROUTINE lpStartAddress,
-	IN LPVOID lpParameter,
-	IN BOOL CreateSuspended,
-	IN DWORD dwStackSize,
-	IN DWORD dw1,
-	IN DWORD dw2,
-	IN LPVOID Unknown
+	IN PVOID lpStartAddress,
+	IN PVOID lpParameter,
+	IN ULONG Flags,
+	IN SIZE_T StackZeroBits,
+	IN SIZE_T SizeOfStackCommit,
+	IN SIZE_T SizeOfStackReserve,
+	OUT PVOID lpBytesBuffer
 	);
 
 typedef NTSTATUS(NTAPI* _NtWaitForSingleObject)(
