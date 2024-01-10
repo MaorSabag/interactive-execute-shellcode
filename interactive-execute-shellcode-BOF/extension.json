@@ -1,0 +1,43 @@
+{
+    "name": "interactive_execute_shellcode",
+    "version": "1.0.0",
+    "command_name": "interactive_execute_shellcode",
+    "extension_author": "MaorSabag",
+    "original_author": "MaorSabag",
+    "repo_url": "https://github.com/MaorSabag/interactive-execute-shellcode",
+    "help": "Injecting into a process and execute shellcode with named pipe to get the shellcode output",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "interactive_execute_shellcode.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "interactive_execute_shellcode.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "target technique",
+            "desc": "The type of the techinque to use for the injection",
+            "type": "string",
+            "optional": false
+        },
+        {
+            "name": "target process",
+            "desc": "Name of the process to inject the shellcode into",
+            "type": "string",
+            "optional": false
+        },
+        {
+            "name": "shellcode file",
+            "desc": "The location to the shellcode file",
+            "type": "file",
+            "optional": false
+        }
+    ]
+}   
